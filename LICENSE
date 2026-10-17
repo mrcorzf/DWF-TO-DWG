@@ -24,4 +24,5 @@ This license covers the new frontend, build scripts and tests only.
 src/dwgwriter.c is separately licensed GPL-3.0-or-later and links LibreDWG.
 The Autodesk DWF Toolkit, its bundled JPEG/HOOPS components, zlib and LibreDWG
 retain their own licenses. They are not relicensed under this MIT license.
-dwf3d and dwgwriter are independent programs communicating through DXF files.
+dwfcore and dwgwriter are independent programs communicating through DXF files.
+dwf3d is a separate Windows interface that starts the conversion process.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Package Windows programs with corresponding sources and license notices."""
+"""Package the Windows interface and engines with sources and license notices."""
 import argparse
 import hashlib
 import json
@@ -17,7 +17,7 @@ def main():
         parser.add_argument("--" + name, type=Path, required=True)
     args = parser.parse_args()
     dist = ROOT / "dist/windows"
-    for name in ("dwf3d.exe", "dwgwriter.exe"):
+    for name in ("dwf3d.exe", "dwfcore.exe", "dwgwriter.exe"):
         if not (dist / name).is_file():
             parser.error(f"Compile primeiro: {dist / name}")
     sources = dist / "sources"
@@ -39,7 +39,7 @@ def main():
                 if entry.is_file() and "__pycache__" not in entry.parts:
                     archive.add(entry, arcname="DWF-TO-DWG/" + str(entry.relative_to(ROOT)))
     (sources / "LEIA-ME.txt").write_text(
-        "Fontes correspondentes dos dois executaveis e de suas dependencias.\n"
+        "Fontes correspondentes da interface, motores de conversao e dependencias.\n"
         "Extraia project.tar.gz. tools/build.py reproduz a compilacao em Linux\n"
         "e busca por HTTPS os mesmos commits listados em VERSIONS.json.\n"
         "Os arquivos toolkit.tar.gz, libredwg.tar.gz e zlib.tar.gz contem\n"
@@ -49,7 +49,7 @@ def main():
         return p.is_file() and p.suffix.lower() not in {".pdb", ".lib"}
     files = sorted(p for p in dist.rglob("*") if included(p) and p.name != "SHA256SUMS.txt")
     (dist / "SHA256SUMS.txt").write_text("".join(hashlib.sha256(p.read_bytes()).hexdigest() + "  " + p.relative_to(dist).as_posix() + "\n" for p in files))
-    output = ROOT / "dist/DWF-3D-para-DWG-Windows-x64.zip"
+    output = ROOT / "dist/DWF-3D-para-DWG-Windows-x64-v2.zip"
     with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
         for path in sorted(dist.rglob("*")):
             if included(path):

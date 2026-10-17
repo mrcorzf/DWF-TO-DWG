@@ -215,21 +215,23 @@ std::string dxf(const std::vector<Face>& faces,const std::vector<Circle>& circle
     o<<"0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1015\n9\n$INSUNITS\n70\n"<<units<<"\n";
     o<<"9\n$MEASUREMENT\n70\n1\n9\n$EXTMIN\n10\n"<<lo[0]<<"\n20\n"<<lo[1]<<"\n30\n"<<lo[2]<<"\n9\n$EXTMAX\n10\n"<<hi[0]<<"\n20\n"<<hi[1]<<"\n30\n"<<hi[2]<<"\n0\nENDSEC\n";
     o<<"0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n5\n1\n100\nAcDbSymbolTable\n70\n"<<meshes+1<<"\n";
-    for(size_t i=0;i<=meshes;++i) o<<"0\nLAYER\n100\nAcDbSymbolTableRecord\n100\nAcDbLayerTableRecord\n2\n"<<(i?"MALHA_"+std::to_string(i):"0")<<"\n70\n0\n62\n7\n6\nCONTINUOUS\n";
+    for(size_t i=0;i<=meshes;++i) o<<"0\nLAYER\n5\n"<<std::hex<<(16+i)<<std::dec<<"\n100\nAcDbSymbolTableRecord\n100\nAcDbLayerTableRecord\n2\n"<<(i?"MALHA_"+std::to_string(i):"0")<<"\n70\n0\n62\n7\n6\nCONTINUOUS\n";
     o<<"0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n";
+    size_t handle=0x100000;
     for(const auto& f:faces) {
-        o<<"0\n3DFACE\n100\nAcDbEntity\n8\nMALHA_"<<f.mesh<<"\n100\nAcDbFace\n";
+        o<<"0\n3DFACE\n5\n"<<std::hex<<handle++<<std::dec<<"\n100\nAcDbEntity\n8\nMALHA_"<<f.mesh<<"\n100\nAcDbFace\n";
         for(int j=0;j<4;++j) for(int k=0;k<3;++k) o<<10+10*k+j<<"\n"<<f.points[j][k]<<"\n";
         o<<"70\n0\n";
     }
     for(const auto& c:circles) {
         Point x=unit(cross(std::abs(c.normal[0])<1.0/64 && std::abs(c.normal[1])<1.0/64?Point{{0,1,0}}:Point{{0,0,1}},c.normal));
         Point y=cross(c.normal,x);
-        o<<"0\nCIRCLE\n100\nAcDbEntity\n8\n0\n100\nAcDbCircle\n10\n"<<dot(c.center,x)<<"\n20\n"<<dot(c.center,y)<<"\n30\n"<<dot(c.center,c.normal)<<"\n40\n"<<c.radius<<"\n210\n"<<c.normal[0]<<"\n220\n"<<c.normal[1]<<"\n230\n"<<c.normal[2]<<"\n";
+        o<<"0\nCIRCLE\n5\n"<<std::hex<<handle++<<std::dec<<"\n100\nAcDbEntity\n8\n0\n100\nAcDbCircle\n10\n"<<dot(c.center,x)<<"\n20\n"<<dot(c.center,y)<<"\n30\n"<<dot(c.center,c.normal)<<"\n40\n"<<c.radius<<"\n210\n"<<c.normal[0]<<"\n220\n"<<c.normal[1]<<"\n230\n"<<c.normal[2]<<"\n";
     }
     o<<"0\nENDSEC\n0\nEOF\n"; return o.str();
 }
 int run(std::vector<std::string> args) {
+    std::cout<<std::unitbuf;
     bool interactive=false;
 #ifdef _WIN32
     if(args.size()==1) {
@@ -246,6 +248,7 @@ int run(std::vector<std::string> args) {
     std::string ext=output.substr(output.find_last_of('.')+1); std::transform(ext.begin(),ext.end(),ext.begin(),[](unsigned char c){return char(std::tolower(c));});
     require(ext=="dxf"||ext=="dwg","Saida deve ter extensao .dwg ou .dxf.");
     require(!exists(output),"Arquivo de saida ja existe. Escolha outro nome: "+output);
+    std::cout<<"ETAPA:Lendo arquivo DWF...\n";
     Package package(input); std::vector<unsigned char> w3d; int units=0; size_t streams=0,descriptors=0;
     for(const Entry& e:package.entries) {
         if(e.name.size()>=4 && e.name.substr(e.name.size()-4)==".w3d") { w3d=package.extract(e); ++streams; }
@@ -262,6 +265,7 @@ int run(std::vector<std::string> args) {
         }
     }
     require(streams==1 && descriptors==1 && units,"Necessario exatamente um modelo W3D com unidades e transformacao suportadas.");
+    std::cout<<"ETAPA:Extraindo geometria 3D...\n";
     Scene scene; BStreamFileToolkit tk;
     tk.SetOpcodeHandler(TKE_Open_Segment,new Open(scene)); tk.SetOpcodeHandler(TKE_Close_Segment,new Close(scene));
     tk.SetOpcodeHandler(TKE_Modelling_Matrix,new Modelling(scene)); tk.SetOpcodeHandler(TKE_Shell,new Shell(scene));
@@ -276,6 +280,7 @@ int run(std::vector<std::string> args) {
     require(scene.stack.size()==1 && scene.meshcount>0,"Modelo vazio ou hierarquia incompleta.");
     std::vector<Face> faces; std::vector<Circle> circles; flatten(scene.root,identity(),faces,circles); require(!faces.empty(),"Modelo sem faces.");
     std::cout<<"Malhas: "<<scene.meshcount<<" (cilindros discretizados: "<<scene.cylindercount<<"); vertices: "<<scene.pointcount<<"; faces 3D: "<<faces.size()<<"; circulos: "<<circles.size()<<"; INSUNITS: "<<units<<"\n";
+    std::cout<<"ETAPA:Preparando desenho...\n";
     std::string content=dxf(faces,circles,units,scene.meshcount);
     if(ext=="dxf") writefile(output,content);
     else {
@@ -289,8 +294,9 @@ int run(std::vector<std::string> args) {
         struct Cleanup { std::wstring a,b; ~Cleanup(){DeleteFileW(a.c_str());DeleteFileW(b.c_str());} } cleanup{temp,dwgtemp};
         writefile(utf8(temp.c_str()),content);
         std::wstring command=L"\""+writer+L"\" \""+temp+L"\" \""+dwgtemp+L"\"";
-        std::vector<wchar_t> cmd(command.begin(),command.end());cmd.push_back(0); STARTUPINFOW si={};si.cb=sizeof(si); PROCESS_INFORMATION pi={};
-        require(CreateProcessW(writer.c_str(),cmd.data(),0,0,FALSE,0,0,0,&si,&pi)!=0,"Falha ao iniciar gravador DWG.");
+        std::cout<<"ETAPA:Gravando e conferindo DWG...\n";
+        std::vector<wchar_t> cmd(command.begin(),command.end());cmd.push_back(0); STARTUPINFOW si={};si.cb=sizeof(si);si.dwFlags=STARTF_USESTDHANDLES;si.hStdInput=GetStdHandle(STD_INPUT_HANDLE);si.hStdOutput=GetStdHandle(STD_OUTPUT_HANDLE);si.hStdError=GetStdHandle(STD_ERROR_HANDLE); PROCESS_INFORMATION pi={};
+        require(CreateProcessW(writer.c_str(),cmd.data(),0,0,TRUE,CREATE_NO_WINDOW,0,0,&si,&pi)!=0,"Falha ao iniciar gravador DWG.");
         WaitForSingleObject(pi.hProcess,INFINITE); DWORD result=1;GetExitCodeProcess(pi.hProcess,&result);CloseHandle(pi.hThread);CloseHandle(pi.hProcess);
         require(result==0,"Falha na gravacao/validacao DWG. Nenhum resultado foi publicado.");
         require(CopyFileW(dwgtemp.c_str(),wide(output).c_str(),TRUE)!=0,"Falha ao copiar DWG para destino (arquivo existente ou acesso negado).");

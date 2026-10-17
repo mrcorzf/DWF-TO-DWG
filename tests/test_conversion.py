@@ -65,6 +65,8 @@ class Conversion(unittest.TestCase):
         self.assertEqual(writer.returncode, 0, writer.stderr)
         self.assertIn("57000 faces 3D, 512 circulos", writer.stdout)
         self.assertEqual(dwg.read_bytes()[:6], b"AC1015")
+        inspected = subprocess.run([str(args.writer), "--inspect", str(dwg)], capture_output=True, text=True, timeout=30)
+        self.assertEqual(inspected.returncode, 0, inspected.stderr)
         before = dwg.read_bytes()
         second = subprocess.run([str(args.writer), str(dxf), str(dwg)], capture_output=True, timeout=30)
         self.assertNotEqual(second.returncode, 0)
@@ -130,6 +132,14 @@ class Conversion(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("opcode 18", result.stderr)
         self.assertFalse(target.exists())
+
+    def test_writer_rejects_incomplete_geometry(self):
+        dxf=self.path / "incomplete.dxf"
+        dxf.write_text("0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1015\n9\n$INSUNITS\n70\n6\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n0\n3DFACE\n10\n1\n0\nENDSEC\n0\nEOF\n")
+        dwg=self.path / "incomplete.dwg"
+        result=subprocess.run([str(args.writer),str(dxf),str(dwg)],capture_output=True,text=True,timeout=30)
+        self.assertNotEqual(result.returncode,0)
+        self.assertFalse(dwg.exists())
 
 
 if __name__ == "__main__":

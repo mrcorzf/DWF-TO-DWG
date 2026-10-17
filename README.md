@@ -1,4 +1,4 @@
-# Conversor DWF 3D para DWG / DXF
+# Conversor DWF 3D para DWG / DXF — versão 2
 
 Conversor local para **Windows 10 (1903 ou posterior) / Windows 11, x64**.
 Lê modelos W3D dentro de pacotes DWF e grava geometria 3D em DWG 2000
@@ -6,21 +6,48 @@ Lê modelos W3D dentro de pacotes DWF e grava geometria 3D em DWG 2000
 
 ## Usar no Windows
 
-1. Extraia o pacote completo para uma pasta. Mantenha `dwf3d.exe` e
-   `dwgwriter.exe` juntos.
-2. Abra `dwf3d.exe` e selecione um DWF. O DWG será criado ao lado dele.
-3. Abra o DWG no seu CAD e use Zoom Extents / Zoom em tudo.
+1. Extraia o pacote completo para uma pasta. Mantenha `dwf3d.exe`,
+   `dwfcore.exe` e `dwgwriter.exe` juntos.
+2. Abra **`dwf3d.exe`**. Selecione o DWF, escolha DWG ou DXF e defina o
+   destino em **Salvar como…**.
+3. Clique em **Converter**. A janela mostra a etapa em andamento, permite
+   cancelar e pode abrir a pasta de destino ao concluir.
+4. Abra o desenho no seu CAD e use Zoom Extents / Zoom em tudo.
+
+O nome sugerido é `nome_convertido.dwg` (ou `.dxf`); se já existir, um
+número é acrescentado. A interface trabalha em um arquivo intermediário
+e só publica o destino quando termina, sem sobrescrever desenhos existentes.
+O botão **Ver detalhes** mostra o registro completo, útil para investigar
+arquivos não suportados. A interface não abre janelas de terminal.
 
 Pelo PowerShell, para escolher nome e formato:
 
 ```powershell
-.\dwf3d.exe "C:\Desenhos\F-2151C.dwf" "C:\Desenhos\F-2151C.dwg"
-.\dwf3d.exe "C:\Desenhos\F-2151C.dwf" "C:\Desenhos\F-2151C.dxf"
+.\dwfcore.exe "C:\Desenhos\F-2151C.dwf" "C:\Desenhos\F-2151C.dwg"
+.\dwfcore.exe "C:\Desenhos\F-2151C.dwf" "C:\Desenhos\F-2151C.dxf"
 ```
 
 Não sobrescreve arquivos existentes. Para repetir uma conversão, escolha outro
-nome de saída. `dwgwriter.exe` é um componente necessário para gerar DWG;
-a saída DXF é produzida diretamente pelo `dwf3d.exe`.
+nome de saída. `dwfcore.exe` é o motor de conversão; `dwgwriter.exe` grava
+o DWG. A saída DXF é produzida diretamente pelo motor de conversão.
+
+## Aviso de recuperação no AutoCAD 2025
+
+A versão 1 abriu no AutoCAD 2025 com solicitação de RECOVER (50 erros
+informados pelo usuário). A inspeção encontrou referências ausentes a
+tabelas e registros obrigatórios, apesar de a geometria passar na releitura.
+
+A versão 2 cria um documento DWG novo com tabelas, blocos, estilos,
+dicionários e camadas antes de adicionar a geometria. O DXF também recebe
+identificadores explícitos e únicos. Antes e depois da gravação, o programa
+verifica referências estruturais, identificadores duplicados e camadas;
+também compara a geometria e os nomes das camadas com a entrada.
+
+Essas verificações rejeitam o DWG antigo e passam no novo exemplo, mas
+**a ausência do aviso RECOVER no AutoCAD 2025 ainda precisa ser confirmada**.
+Não foi executado AutoCAD neste ambiente. Se o aviso persistir, use a
+saída DXF e abra-a no AutoCAD para salvar como DWG; envie o relatório
+detalhado de AUDIT/RECOVER para identificar os erros restantes.
 
 ## Escopo e precisão
 
@@ -50,12 +77,14 @@ unidades em metros. SHA-256:
 
 Leitura completa: 626 malhas originais, 256 cilindros e 512 círculos.
 Resultado: **57.000 entidades 3DFACE e 512 entidades CIRCLE**.
-O gravador relê o DWG e compara todas as coordenadas, raios, normais e
-unidades com a entrada DXF, com tolerância absoluta de `1e-9` unidades.
+O gravador relê o DWG e compara coordenadas, raios, normais, unidades e
+nomes das camadas com a entrada DXF, com tolerância absoluta de `1e-9`
+unidades para os valores numéricos. A estrutura também é verificada.
 
-Os testes de conversão foram executados no Linux. Os executáveis Windows
-são compilados para x64; a execução e a interface no Windows, assim como
-a abertura no AutoCAD/Navisworks, ainda precisam de validação nesse sistema.
+Os testes de conversão e de estrutura foram executados no Linux. O usuário
+confirmou a execução da versão 1 no Windows e a visualização da geometria
+após RECOVER. A versão 2, incluindo a nova interface, foi compilada para
+Windows x64; sua execução e abertura no AutoCAD ainda precisam de validação.
 
 ## Compilar a partir do código
 
@@ -88,7 +117,8 @@ dist/linux/dwgwriter /tmp/modelo.dxf /tmp/modelo.dwg
 
 ## Componentes e licenças
 
-`dwf3d` usa o Autodesk DWF Toolkit e zlib; seu frontend novo tem licença MIT.
+`dwf3d` é a interface nativa do Windows. `dwfcore` usa o Autodesk DWF Toolkit
+e zlib; a interface e o frontend novo têm licença MIT.
 `dwgwriter` é um programa separado, sob GPLv3+, que usa LibreDWG. A comunicação
 entre os programas ocorre por arquivo DXF; não há ligação entre as bibliotecas
 Autodesk e LibreDWG. Licenças dos componentes acompanham a distribuição.

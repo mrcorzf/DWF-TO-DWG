@@ -132,16 +132,23 @@ def main():
     if windows:
         resource = [work / "windows.res"]
         run([zig, "rc", "/fo", resource[0], "windows.rc"], cwd=ROOT / "src", log=work / "resource.log", env=env)
-    run(cxx + [*objects, frontend, *resource, "-o", dist / ("dwf3d" + extension)] +
+    run(cxx + [*objects, frontend, *resource, "-o", dist / ("dwfcore.exe" if windows else "dwf3d")] +
         (["-municode", "-lcomdlg32", "-luser32", "-static"] if windows else []), log=work / "frontend-link.log", env=env)
     run(cc + ["-std=gnu99", "-O1", "-I" + str(libbuild / "src"), "-I" + str(deps["libredwg"] / "include"),
               ROOT / "src/dwgwriter.c", libbuild / "libredwg.a", *resource, "-lm", "-o", dist / ("dwgwriter" + extension)] +
         (["-static"] if windows else []), log=work / "writer-link.log", env=env)
+    if windows:
+        run(cxx + ["-std=gnu++11", "-O1", ROOT / "src/gui.cpp", *resource, "-municode", "-Wl,--subsystem,windows",
+                   "-lcomdlg32", "-lcomctl32", "-lshell32", "-luser32", "-lgdi32", "-static", "-o", dist / "dwf3d.exe"],
+            log=work / "gui-link.log", env=env)
     if not windows:
         geometry = compile_one((ROOT / "tests/geometry.cpp", True))
         run(cxx + [*objects, geometry, "-o", work / "geometry-test"], log=work / "test-link.log", env=env)
         run([work / "geometry-test"], env=env)
-    (dist / "VERSIONS.json").write_text(json.dumps({name: pin[1] for name, pin in PINS.items()}, indent=2) + "\n")
+        run(cc + ["-std=gnu99", "-O1", "-I" + str(libbuild / "src"), "-I" + str(deps["libredwg"] / "include"),
+                  ROOT / "tests/structure.c", libbuild / "libredwg.a", "-lm", "-o", work / "structure-test"], log=work / "structure-link.log", env=env)
+        run([work / "structure-test"], env=env)
+    (dist / "VERSIONS.json").write_text(json.dumps({"application": "2.0.0", **{name: pin[1] for name, pin in PINS.items()}}, indent=2) + "\n")
     shutil.copy2(ROOT / "README.md", dist / "LEIA-ME.md")
     licenses = dist / "licenses"
     licenses.mkdir(exist_ok=True)
